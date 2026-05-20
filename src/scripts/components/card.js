@@ -4,8 +4,7 @@ const getCardTemplateNode = () =>
     .content.querySelector(".card")
     .cloneNode(true);
 
-export const refreshLikeDisplay = (cardInfo, likeControl, likesCounter) => {
-  const currentUserKey = likeControl.dataset.currentUserKey;
+export const refreshLikeDisplay = (cardInfo, likeControl, likesCounter, currentUserKey) => {
   const userLiked = cardInfo.likes.some((liker) => liker._id === currentUserKey);
   likeControl.classList.toggle("card__like-button_is-active", userLiked);
   likesCounter.textContent = cardInfo.likes.length;
@@ -30,8 +29,7 @@ export const createCardElement = (
   imageElement.src = cardInfo.link;
   imageElement.alt = cardInfo.name;
   cardNode.querySelector(".card__title").textContent = cardInfo.name;
-  likeControl.dataset.currentUserKey = currentUserKey;
-  refreshLikeDisplay(cardInfo, likeControl, likesCounter);
+  refreshLikeDisplay(cardInfo, likeControl, likesCounter, currentUserKey);
 
   const isAuthor = cardInfo.owner._id === currentUserKey;
   if (!isAuthor) {

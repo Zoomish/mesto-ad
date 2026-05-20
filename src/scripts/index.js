@@ -45,6 +45,9 @@ const validationConfig = {
   inactiveButtonClass: "popup__button_disabled",
   inputErrorClass: "popup__input_type_error",
   errorClass: "popup__error_visible",
+  lettersOnlyClassList: ["popup__input_type_name", "popup__input_type_card-name"],
+  lettersOnlyMessage:
+    "Разрешены только латинские, кириллические буквы, знаки дефиса и пробелы",
 };
 
 const avatarModal = document.querySelector(".popup_type_edit-avatar");
@@ -145,7 +148,7 @@ const showCardInfoModal = (cardId) => {
 const handleLikeButtonClick = ({ cardId, likedByMe, likeControl, likesCounter }) => {
   requestLikeToggle(cardId, likedByMe)
     .then((updatedCard) => {
-      refreshLikeDisplay(updatedCard, likeControl, likesCounter);
+      refreshLikeDisplay(updatedCard, likeControl, likesCounter, currentUserKey);
     })
     .catch(onApiError);
 };
@@ -224,7 +227,6 @@ newCardFormElement.addEventListener("submit", (event) => {
     }).then((cardInfo) => {
       addCardToList(cardInfo, true);
       closeModal(newCardModal);
-      newCardFormElement.reset();
     })
   );
 });

@@ -1,3 +1,10 @@
+const lettersOnlyPattern = /^[A-Za-zА-Яа-яЁё\s-]+$/;
+
+function isLettersOnlyInput(inputElement, validationConfig) {
+  const classList = validationConfig.lettersOnlyClassList || [];
+  return classList.some((className) => inputElement.classList.contains(className));
+}
+
 function revealError(formElement, inputElement, message, validationConfig) {
   const errorNode = formElement.querySelector(`#${inputElement.id}-error`);
   errorNode.textContent = message;
@@ -13,7 +20,15 @@ function resetError(formElement, inputElement, validationConfig) {
 }
 
 function inspectInput(formElement, inputElement, validationConfig) {
-  if (inputElement.validity.patternMismatch && inputElement.dataset.errorMessage) {
+  if (isLettersOnlyInput(inputElement, validationConfig)) {
+    const customMessage =
+      inputElement.dataset.errorMessage || validationConfig.lettersOnlyMessage;
+    if (!lettersOnlyPattern.test(inputElement.value)) {
+      inputElement.setCustomValidity(customMessage);
+    } else {
+      inputElement.setCustomValidity("");
+    }
+  } else if (inputElement.validity.patternMismatch && inputElement.dataset.errorMessage) {
     inputElement.setCustomValidity(inputElement.dataset.errorMessage);
   } else {
     inputElement.setCustomValidity("");
