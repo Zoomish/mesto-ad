@@ -1,97 +1,96 @@
-const lettersOnlyPattern = /^[A-Za-zА-Яа-яЁё\s-]+$/;
+const nameAndTitlePattern = /^[A-Za-zА-Яа-яЁё\s-]+$/;
 
-function isLettersOnlyInput(inputElement, validationConfig) {
-  const classList = validationConfig.lettersOnlyClassList || [];
-  return classList.some((className) => inputElement.classList.contains(className));
-}
+const usesRestrictedSymbols = (input, settings) => {
+  const classes = settings.lettersOnlyClassList || [];
+  return classes.some((className) => input.classList.contains(className));
+};
 
-function revealError(formElement, inputElement, message, validationConfig) {
-  const errorNode = formElement.querySelector(`#${inputElement.id}-error`);
-  errorNode.textContent = message;
-  errorNode.classList.add(validationConfig.errorClass);
-  inputElement.classList.add(validationConfig.inputErrorClass);
-}
+const showInputError = (form, input, message, settings) => {
+  const errorElement = form.querySelector(`#${input.id}-error`);
+  errorElement.textContent = message;
+  errorElement.classList.add(settings.errorClass);
+  input.classList.add(settings.inputErrorClass);
+};
 
-function resetError(formElement, inputElement, validationConfig) {
-  const errorNode = formElement.querySelector(`#${inputElement.id}-error`);
-  errorNode.textContent = "";
-  errorNode.classList.remove(validationConfig.errorClass);
-  inputElement.classList.remove(validationConfig.inputErrorClass);
-}
+const hideInputError = (form, input, settings) => {
+  const errorElement = form.querySelector(`#${input.id}-error`);
+  errorElement.textContent = "";
+  errorElement.classList.remove(settings.errorClass);
+  input.classList.remove(settings.inputErrorClass);
+};
 
-function inspectInput(formElement, inputElement, validationConfig) {
-  if (isLettersOnlyInput(inputElement, validationConfig)) {
-    const customMessage =
-      inputElement.dataset.errorMessage || validationConfig.lettersOnlyMessage;
-    if (!lettersOnlyPattern.test(inputElement.value)) {
-      inputElement.setCustomValidity(customMessage);
+const checkInputValidity = (form, input, settings) => {
+  if (usesRestrictedSymbols(input, settings)) {
+    const message = input.dataset.errorMessage || settings.lettersOnlyMessage;
+    if (!nameAndTitlePattern.test(input.value)) {
+      input.setCustomValidity(message);
     } else {
-      inputElement.setCustomValidity("");
+      input.setCustomValidity("");
     }
-  } else if (inputElement.validity.patternMismatch && inputElement.dataset.errorMessage) {
-    inputElement.setCustomValidity(inputElement.dataset.errorMessage);
+  } else if (input.validity.patternMismatch && input.dataset.errorMessage) {
+    input.setCustomValidity(input.dataset.errorMessage);
   } else {
-    inputElement.setCustomValidity("");
+    input.setCustomValidity("");
   }
 
-  if (!inputElement.validity.valid) {
-    revealError(formElement, inputElement, inputElement.validationMessage, validationConfig);
+  if (!input.validity.valid) {
+    showInputError(form, input, input.validationMessage, settings);
     return;
   }
 
-  resetError(formElement, inputElement, validationConfig);
-}
+  hideInputError(form, input, settings);
+};
 
-function formInvalid(formElement, validationConfig) {
-  const inputs = formElement.querySelectorAll(validationConfig.inputSelector);
+const hasInvalidInput = (form, settings) => {
+  const inputs = form.querySelectorAll(settings.inputSelector);
   return Array.from(inputs).some((input) => !input.validity.valid);
-}
+};
 
-function setButtonInactive(formElement, validationConfig) {
-  const submitButton = formElement.querySelector(validationConfig.submitButtonSelector);
-  submitButton.disabled = true;
-  submitButton.classList.add(validationConfig.inactiveButtonClass);
-}
+const disableSubmitButton = (form, settings) => {
+  const button = form.querySelector(settings.submitButtonSelector);
+  button.disabled = true;
+  button.classList.add(settings.inactiveButtonClass);
+};
 
-function setButtonActive(formElement, validationConfig) {
-  const submitButton = formElement.querySelector(validationConfig.submitButtonSelector);
-  submitButton.disabled = false;
-  submitButton.classList.remove(validationConfig.inactiveButtonClass);
-}
+const enableSubmitButton = (form, settings) => {
+  const button = form.querySelector(settings.submitButtonSelector);
+  button.disabled = false;
+  button.classList.remove(settings.inactiveButtonClass);
+};
 
-function updateFormButton(formElement, validationConfig) {
-  if (formInvalid(formElement, validationConfig)) {
-    setButtonInactive(formElement, validationConfig);
+const toggleButtonState = (form, settings) => {
+  if (hasInvalidInput(form, settings)) {
+    disableSubmitButton(form, settings);
   } else {
-    setButtonActive(formElement, validationConfig);
+    enableSubmitButton(form, settings);
   }
-}
+};
 
-function listenInputs(formElement, validationConfig) {
-  const inputs = formElement.querySelectorAll(validationConfig.inputSelector);
-  inputs.forEach((inputElement) => {
-    inputElement.addEventListener("input", () => {
-      inspectInput(formElement, inputElement, validationConfig);
-      updateFormButton(formElement, validationConfig);
+const setEventListeners = (form, settings) => {
+  const inputs = form.querySelectorAll(settings.inputSelector);
+  inputs.forEach((input) => {
+    input.addEventListener("input", () => {
+      checkInputValidity(form, input, settings);
+      toggleButtonState(form, settings);
     });
   });
-}
+};
 
-function clearValidation(formElement, validationConfig) {
-  const inputs = formElement.querySelectorAll(validationConfig.inputSelector);
-  inputs.forEach((inputElement) => {
-    inputElement.setCustomValidity("");
-    resetError(formElement, inputElement, validationConfig);
+const clearValidation = (form, settings) => {
+  const inputs = form.querySelectorAll(settings.inputSelector);
+  inputs.forEach((input) => {
+    input.setCustomValidity("");
+    hideInputError(form, input, settings);
   });
-  setButtonInactive(formElement, validationConfig);
-}
+  disableSubmitButton(form, settings);
+};
 
-function enableValidation(validationConfig) {
-  const forms = document.querySelectorAll(validationConfig.formSelector);
-  forms.forEach((formElement) => {
-    listenInputs(formElement, validationConfig);
-    updateFormButton(formElement, validationConfig);
+const enableValidation = (settings) => {
+  const forms = document.querySelectorAll(settings.formSelector);
+  forms.forEach((form) => {
+    setEventListeners(form, settings);
+    toggleButtonState(form, settings);
   });
-}
+};
 
 export { enableValidation, clearValidation };

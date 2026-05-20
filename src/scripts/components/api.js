@@ -1,53 +1,48 @@
 const GROUP_ID = "";
 const TOKEN = "";
 
-const apiConfig = {
-  baseUrl: `https://mesto.nomoreparties.co/v1/${GROUP_ID}`,
-  headers: {
-    authorization: TOKEN,
-    "Content-Type": "application/json",
-  },
-};
+const getApiUrl = (path) => `https://mesto.nomoreparties.co/v1/${GROUP_ID}${path}`;
 
-const parseResponse = (response) => {
-  if (response.ok) {
-    return response.json();
-  }
-  return Promise.reject(`Ошибка: ${response.status}`);
-};
+const getRequestHeaders = () => ({
+  authorization: TOKEN,
+  "Content-Type": "application/json",
+});
 
-const callApi = (endpoint, requestInit = {}) =>
-  fetch(`${apiConfig.baseUrl}${endpoint}`, {
-    headers: apiConfig.headers,
-    ...requestInit,
-  }).then(parseResponse);
+const handleFetchResult = (response) =>
+  response.ok ? response.json() : Promise.reject(`Ошибка: ${response.status}`);
 
-export const requestUserInfo = () => callApi("/users/me");
+const request = (path, options = {}) =>
+  fetch(getApiUrl(path), {
+    headers: getRequestHeaders(),
+    ...options,
+  }).then(handleFetchResult);
 
-export const requestCardsData = () => callApi("/cards");
+export const getOwnerProfile = () => request("/users/me");
 
-export const updateUserInfo = ({ name, about }) =>
-  callApi("/users/me", {
+export const getPlacesList = () => request("/cards");
+
+export const patchOwnerProfile = ({ name, about }) =>
+  request("/users/me", {
     method: "PATCH",
     body: JSON.stringify({ name, about }),
   });
 
-export const updateUserAvatar = ({ avatar }) =>
-  callApi("/users/me/avatar", {
+export const patchOwnerPhoto = ({ avatar }) =>
+  request("/users/me/avatar", {
     method: "PATCH",
     body: JSON.stringify({ avatar }),
   });
 
-export const submitNewCard = ({ name, link }) =>
-  callApi("/cards", {
+export const postNewPlace = ({ name, link }) =>
+  request("/cards", {
     method: "POST",
     body: JSON.stringify({ name, link }),
   });
 
-export const requestDeleteCard = (cardId) =>
-  callApi(`/cards/${cardId}`, { method: "DELETE" });
+export const deletePlace = (placeId) =>
+  request(`/cards/${placeId}`, { method: "DELETE" });
 
-export const requestLikeToggle = (cardId, likedByMe) =>
-  callApi(`/cards/likes/${cardId}`, {
-    method: likedByMe ? "DELETE" : "PUT",
+export const togglePlaceLike = (placeId, userAlreadyLiked) =>
+  request(`/cards/likes/${placeId}`, {
+    method: userAlreadyLiked ? "DELETE" : "PUT",
   });

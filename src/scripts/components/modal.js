@@ -1,38 +1,34 @@
-let escapeHandler = null;
+const closeOpenedPopup = () => {
+  const opened = document.querySelector(".popup_is-opened");
+  if (opened) {
+    disablePopup(opened);
+  }
+};
 
-const onEscapePress = (event) => {
+const handleDocumentKeyup = (event) => {
   if (event.key === "Escape") {
-    const openedModal = document.querySelector(".popup_is-opened");
-    closeModal(openedModal);
+    closeOpenedPopup();
   }
 };
 
-export const openModal = (modalElement) => {
-  modalElement.classList.add("popup_is-opened");
-  escapeHandler = onEscapePress;
-  document.addEventListener("keyup", escapeHandler);
+export const enablePopup = (popup) => {
+  popup.classList.add("popup_is-opened");
+  document.addEventListener("keyup", handleDocumentKeyup);
 };
 
-export const closeModal = (modalElement) => {
-  if (!modalElement) {
-    return;
-  }
-  modalElement.classList.remove("popup_is-opened");
-  document.removeEventListener("keyup", escapeHandler);
-  escapeHandler = null;
+export const disablePopup = (popup) => {
+  popup.classList.remove("popup_is-opened");
+  document.removeEventListener("keyup", handleDocumentKeyup);
 };
 
-export const setupModalControls = (modalElement) => {
-  const closeControl = modalElement.querySelector(".popup__close");
-
-  closeControl.addEventListener("click", () => {
-    closeModal(modalElement);
+export const registerPopupClosing = (popup) => {
+  popup.querySelector(".popup__close").addEventListener("click", () => {
+    disablePopup(popup);
   });
 
-  modalElement.addEventListener("mousedown", (event) => {
-    const clickedOverlay = event.target.classList.contains("popup");
-    if (clickedOverlay) {
-      closeModal(modalElement);
+  popup.addEventListener("mousedown", (event) => {
+    if (event.target.classList.contains("popup")) {
+      disablePopup(popup);
     }
   });
 };

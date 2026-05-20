@@ -1,44 +1,44 @@
 import {
-  createCardElement,
-  removeCardFromPage,
-  refreshLikeDisplay,
+  instantiatePlaceCard,
+  deletePlaceElement,
+  renderLikeState,
 } from "./components/card.js";
-import { openModal, closeModal, setupModalControls } from "./components/modal.js";
+import { enablePopup, disablePopup, registerPopupClosing } from "./components/modal.js";
 import { enableValidation, clearValidation } from "./components/validation.js";
 import {
-  requestUserInfo,
-  requestCardsData,
-  updateUserInfo,
-  updateUserAvatar,
-  submitNewCard,
-  requestDeleteCard,
-  requestLikeToggle,
+  getOwnerProfile,
+  getPlacesList,
+  patchOwnerProfile,
+  patchOwnerPhoto,
+  postNewPlace,
+  deletePlace,
+  togglePlaceLike,
 } from "./components/api.js";
 
-const cardsListElement = document.querySelector(".places__list");
+const placesList = document.querySelector(".places__list");
 
-const profileModal = document.querySelector(".popup_type_edit");
-const profileFormElement = profileModal.querySelector(".popup__form");
-const profileNameInput = profileFormElement.querySelector(".popup__input_type_name");
-const profileAboutInput = profileFormElement.querySelector(".popup__input_type_description");
+const editProfilePopup = document.querySelector(".popup_type_edit");
+const editProfileForm = editProfilePopup.querySelector(".popup__form");
+const editNameField = editProfileForm.querySelector(".popup__input_type_name");
+const editAboutField = editProfileForm.querySelector(".popup__input_type_description");
 
-const newCardModal = document.querySelector(".popup_type_new-card");
-const newCardFormElement = newCardModal.querySelector(".popup__form");
-const newCardNameInput = newCardFormElement.querySelector(".popup__input_type_card-name");
-const newCardLinkInput = newCardFormElement.querySelector(".popup__input_type_url");
+const addPlacePopup = document.querySelector(".popup_type_new-card");
+const addPlaceForm = addPlacePopup.querySelector(".popup__form");
+const addPlaceNameField = addPlaceForm.querySelector(".popup__input_type_card-name");
+const addPlaceLinkField = addPlaceForm.querySelector(".popup__input_type_url");
 
-const previewModal = document.querySelector(".popup_type_image");
-const previewImageElement = previewModal.querySelector(".popup__image");
-const previewCaptionElement = previewModal.querySelector(".popup__caption");
+const imagePopup = document.querySelector(".popup_type_image");
+const imagePopupPicture = imagePopup.querySelector(".popup__image");
+const imagePopupCaption = imagePopup.querySelector(".popup__caption");
 
-const profileEditButton = document.querySelector(".profile__edit-button");
-const newCardButton = document.querySelector(".profile__add-button");
+const editProfileControl = document.querySelector(".profile__edit-button");
+const addPlaceControl = document.querySelector(".profile__add-button");
 
-const profileNameElement = document.querySelector(".profile__title");
-const profileAboutElement = document.querySelector(".profile__description");
-const profileAvatarElement = document.querySelector(".profile__image");
+const headerName = document.querySelector(".profile__title");
+const headerAbout = document.querySelector(".profile__description");
+const headerAvatar = document.querySelector(".profile__image");
 
-const validationConfig = {
+const formSettings = {
   formSelector: ".popup__form",
   inputSelector: ".popup__input",
   submitButtonSelector: ".popup__button",
@@ -50,221 +50,210 @@ const validationConfig = {
     "Разрешены только латинские, кириллические буквы, знаки дефиса и пробелы",
 };
 
-const avatarModal = document.querySelector(".popup_type_edit-avatar");
-const avatarFormElement = avatarModal.querySelector(".popup__form");
-const avatarLinkInput = avatarFormElement.querySelector(".popup__input_type_avatar");
+const changeAvatarPopup = document.querySelector(".popup_type_edit-avatar");
+const changeAvatarForm = changeAvatarPopup.querySelector(".popup__form");
+const changeAvatarLinkField = changeAvatarForm.querySelector(".popup__input_type_avatar");
 
-const cardInfoModal = document.querySelector(".popup_type_info");
-const cardInfoDefinitions = cardInfoModal.querySelector(".popup__list_type_definitions");
-const cardInfoLikers = cardInfoModal.querySelector(".popup__list_type_users");
-const cardInfoDefinitionTemplate = document.querySelector(
-  "#popup-info-definition-template"
-).content;
-const cardInfoUserTemplate = document.querySelector("#popup-info-user-preview-template")
+const placeDetailsPopup = document.querySelector(".popup_type_info");
+const placeDetailsRows = placeDetailsPopup.querySelector(".popup__list_type_definitions");
+const placeDetailsUsers = placeDetailsPopup.querySelector(".popup__list_type_users");
+const placeDetailsRowTemplate = document.querySelector("#popup-info-definition-template")
+  .content;
+const placeDetailsUserTemplate = document.querySelector("#popup-info-user-preview-template")
   .content;
 
-const modalElements = document.querySelectorAll(".popup");
+const popupCollection = document.querySelectorAll(".popup");
 
-let currentUserKey = "";
+let pageUserId = "";
 
-const onApiError = () => {};
+const silentRequestFail = () => {};
 
-const formatRussianDate = (dateValue) =>
-  dateValue.toLocaleDateString("ru-RU", {
+const toRussianDate = (date) =>
+  date.toLocaleDateString("ru-RU", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
 
-const toggleSubmitLabel = (submitButton, isBusy, busyLabel) => {
-  if (!submitButton.dataset.savedLabel) {
-    submitButton.dataset.savedLabel = submitButton.textContent;
+const storeButtonText = (button) => {
+  if (!button.dataset.originalText) {
+    button.dataset.originalText = button.textContent;
   }
-  submitButton.textContent = isBusy ? busyLabel : submitButton.dataset.savedLabel;
 };
 
-const renderUserOnPage = (userInfo) => {
-  profileNameElement.textContent = userInfo.name;
-  profileAboutElement.textContent = userInfo.about;
-  profileAvatarElement.style.backgroundImage = `url(${userInfo.avatar})`;
-  currentUserKey = userInfo._id;
-};
-
-const showImagePreview = (cardInfo) => {
-  previewImageElement.src = cardInfo.link;
-  previewImageElement.alt = cardInfo.name;
-  previewCaptionElement.textContent = cardInfo.name;
-  openModal(previewModal);
-};
-
-const buildDefinitionRow = (title, description) => {
-  const rowElement = cardInfoDefinitionTemplate
-    .querySelector(".popup__list-item")
-    .cloneNode(true);
-  rowElement.querySelector(".popup__info-term").textContent = title;
-  rowElement.querySelector(".popup__info-item").textContent = description;
-  return rowElement;
-};
-
-const buildLikerBadge = (userName) => {
-  const badgeElement = cardInfoUserTemplate
-    .querySelector(".popup__list-item_type_badge")
-    .cloneNode(true);
-  badgeElement.textContent = userName;
-  return badgeElement;
-};
-
-const showCardInfoModal = (cardId) => {
-  requestCardsData()
-    .then((cards) => {
-      const targetCard = cards.find((card) => card._id === cardId);
-      if (!targetCard) {
-        return;
-      }
-
-      cardInfoDefinitions.replaceChildren(
-        buildDefinitionRow("Описание:", targetCard.name),
-        buildDefinitionRow(
-          "Дата создания:",
-          formatRussianDate(new Date(targetCard.createdAt))
-        ),
-        buildDefinitionRow("Владелец:", targetCard.owner.name),
-        buildDefinitionRow("Количество лайков:", String(targetCard.likes.length))
-      );
-
-      if (targetCard.likes.length === 0) {
-        cardInfoLikers.replaceChildren(buildLikerBadge("Пока никто не лайкнул"));
-      } else {
-        cardInfoLikers.replaceChildren(
-          ...targetCard.likes.map((liker) => buildLikerBadge(liker.name))
-        );
-      }
-
-      openModal(cardInfoModal);
-    })
-    .catch(onApiError);
-};
-
-const handleLikeButtonClick = ({ cardId, likedByMe, likeControl, likesCounter }) => {
-  requestLikeToggle(cardId, likedByMe)
-    .then((updatedCard) => {
-      refreshLikeDisplay(updatedCard, likeControl, likesCounter, currentUserKey);
-    })
-    .catch(onApiError);
-};
-
-const handleDeleteButtonClick = ({ cardId, cardNode }) => {
-  requestDeleteCard(cardId)
-    .then(() => {
-      removeCardFromPage(cardNode);
-    })
-    .catch(onApiError);
-};
-
-const addCardToList = (cardInfo, toBeginning = false) => {
-  const cardNode = createCardElement(cardInfo, currentUserKey, {
-    onImageOpen: showImagePreview,
-    onLikeToggle: handleLikeButtonClick,
-    onCardDelete: handleDeleteButtonClick,
-    onCardInfo: showCardInfoModal,
-  });
-
-  if (toBeginning) {
-    cardsListElement.prepend(cardNode);
-    return;
-  }
-
-  cardsListElement.append(cardNode);
-};
-
-const runWithSubmitState = (submitButton, busyLabel, requestPromise) => {
-  toggleSubmitLabel(submitButton, true, busyLabel);
-  return requestPromise
-    .catch(onApiError)
+const withButtonLoader = (button, loadingText, action) => {
+  storeButtonText(button);
+  button.textContent = loadingText;
+  return action()
+    .catch(silentRequestFail)
     .finally(() => {
-      toggleSubmitLabel(submitButton, false);
+      button.textContent = button.dataset.originalText;
     });
 };
 
-profileFormElement.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const submitButton = event.submitter;
-  runWithSubmitState(
-    submitButton,
-    "Сохранение...",
-    updateUserInfo({
-      name: profileNameInput.value,
-      about: profileAboutInput.value,
-    }).then((userInfo) => {
-      renderUserOnPage(userInfo);
-      closeModal(profileModal);
-    })
-  );
-});
-
-avatarFormElement.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const submitButton = event.submitter;
-  runWithSubmitState(
-    submitButton,
-    "Сохранение...",
-    updateUserAvatar({ avatar: avatarLinkInput.value }).then((userInfo) => {
-      renderUserOnPage(userInfo);
-      closeModal(avatarModal);
-    })
-  );
-});
-
-newCardFormElement.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const submitButton = event.submitter;
-  runWithSubmitState(
-    submitButton,
-    "Создание...",
-    submitNewCard({
-      name: newCardNameInput.value,
-      link: newCardLinkInput.value,
-    }).then((cardInfo) => {
-      addCardToList(cardInfo, true);
-      closeModal(newCardModal);
-    })
-  );
-});
-
-profileEditButton.addEventListener("click", () => {
-  profileNameInput.value = profileNameElement.textContent;
-  profileAboutInput.value = profileAboutElement.textContent;
-  clearValidation(profileFormElement, validationConfig);
-  openModal(profileModal);
-});
-
-profileAvatarElement.addEventListener("click", () => {
-  avatarFormElement.reset();
-  clearValidation(avatarFormElement, validationConfig);
-  openModal(avatarModal);
-});
-
-newCardButton.addEventListener("click", () => {
-  newCardFormElement.reset();
-  clearValidation(newCardFormElement, validationConfig);
-  openModal(newCardModal);
-});
-
-modalElements.forEach((modalElement) => {
-  setupModalControls(modalElement);
-});
-
-enableValidation(validationConfig);
-
-const initApp = () => {
-  Promise.all([requestCardsData(), requestUserInfo()])
-    .then(([cards, userInfo]) => {
-      renderUserOnPage(userInfo);
-      cards.forEach((cardInfo) => {
-        addCardToList(cardInfo);
-      });
-    })
-    .catch(onApiError);
+const updateHeader = (profile) => {
+  headerName.textContent = profile.name;
+  headerAbout.textContent = profile.about;
+  headerAvatar.style.backgroundImage = `url(${profile.avatar})`;
+  pageUserId = profile._id;
 };
 
-initApp();
+const openImagePopup = (place) => {
+  imagePopupPicture.src = place.link;
+  imagePopupPicture.alt = place.name;
+  imagePopupCaption.textContent = place.name;
+  enablePopup(imagePopup);
+};
+
+const createDetailsRow = (label, value) => {
+  const row = placeDetailsRowTemplate.querySelector(".popup__list-item").cloneNode(true);
+  row.querySelector(".popup__info-term").textContent = label;
+  row.querySelector(".popup__info-item").textContent = value;
+  return row;
+};
+
+const createUserLabel = (name) => {
+  const label = placeDetailsUserTemplate
+    .querySelector(".popup__list-item_type_badge")
+    .cloneNode(true);
+  label.textContent = name;
+  return label;
+};
+
+const openPlaceDetails = (placeId) => {
+  getPlacesList()
+    .then((places) => {
+      const place = places.find((item) => item._id === placeId);
+      if (!place) {
+        return;
+      }
+
+      placeDetailsRows.replaceChildren(
+        createDetailsRow("Описание:", place.name),
+        createDetailsRow("Дата создания:", toRussianDate(new Date(place.createdAt))),
+        createDetailsRow("Владелец:", place.owner.name),
+        createDetailsRow("Количество лайков:", String(place.likes.length))
+      );
+
+      if (place.likes.length === 0) {
+        placeDetailsUsers.replaceChildren(createUserLabel("Пока никто не лайкнул"));
+      } else {
+        placeDetailsUsers.replaceChildren(
+          ...place.likes.map((person) => createUserLabel(person.name))
+        );
+      }
+
+      enablePopup(placeDetailsPopup);
+    })
+    .catch(silentRequestFail);
+};
+
+const onPlaceLike = ({ placeId, userAlreadyLiked, likeButton, likeCount }) => {
+  togglePlaceLike(placeId, userAlreadyLiked)
+    .then((updatedPlace) => {
+      renderLikeState(updatedPlace, likeButton, likeCount, pageUserId);
+    })
+    .catch(silentRequestFail);
+};
+
+const onPlaceRemove = ({ placeId, element }) => {
+  deletePlace(placeId)
+    .then(() => {
+      deletePlaceElement(element);
+    })
+    .catch(silentRequestFail);
+};
+
+const insertPlace = (place, insertFirst = false) => {
+  const element = instantiatePlaceCard(place, pageUserId, {
+    previewImage: openImagePopup,
+    likeClick: onPlaceLike,
+    removeClick: onPlaceRemove,
+    detailsClick: openPlaceDetails,
+  });
+
+  if (insertFirst) {
+    placesList.prepend(element);
+    return;
+  }
+
+  placesList.append(element);
+};
+
+editProfileForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const button = event.submitter;
+  withButtonLoader(button, "Сохранение...", () =>
+    patchOwnerProfile({
+      name: editNameField.value,
+      about: editAboutField.value,
+    }).then((profile) => {
+      updateHeader(profile);
+      disablePopup(editProfilePopup);
+    })
+  );
+});
+
+changeAvatarForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const button = event.submitter;
+  withButtonLoader(button, "Сохранение...", () =>
+    patchOwnerPhoto({ avatar: changeAvatarLinkField.value }).then((profile) => {
+      updateHeader(profile);
+      disablePopup(changeAvatarPopup);
+    })
+  );
+});
+
+addPlaceForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const button = event.submitter;
+  withButtonLoader(button, "Создание...", () =>
+    postNewPlace({
+      name: addPlaceNameField.value,
+      link: addPlaceLinkField.value,
+    }).then((place) => {
+      insertPlace(place, true);
+      disablePopup(addPlacePopup);
+    })
+  );
+});
+
+editProfileControl.addEventListener("click", () => {
+  editNameField.value = headerName.textContent;
+  editAboutField.value = headerAbout.textContent;
+  clearValidation(editProfileForm, formSettings);
+  enablePopup(editProfilePopup);
+});
+
+headerAvatar.addEventListener("click", () => {
+  changeAvatarForm.reset();
+  clearValidation(changeAvatarForm, formSettings);
+  enablePopup(changeAvatarPopup);
+});
+
+addPlaceControl.addEventListener("click", () => {
+  addPlaceForm.reset();
+  clearValidation(addPlaceForm, formSettings);
+  enablePopup(addPlacePopup);
+});
+
+popupCollection.forEach((popup) => {
+  registerPopupClosing(popup);
+});
+
+enableValidation(formSettings);
+
+const startApplication = async () => {
+  try {
+    const [places, profile] = await Promise.all([getPlacesList(), getOwnerProfile()]);
+    updateHeader(profile);
+    places.forEach((place) => {
+      insertPlace(place);
+    });
+  } catch {
+    silentRequestFail();
+  }
+};
+
+startApplication();
